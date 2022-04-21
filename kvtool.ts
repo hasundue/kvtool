@@ -5,6 +5,13 @@ type Config = {
   apiToken: string;
 };
 
+type ApiResponse = {
+  success: boolean;
+  errors: string[];
+  messages: string[];
+  [field: string]: unknown;
+}
+
 type Method = "GET" | "POST";
 
 export async function readConfig(path: string) {
@@ -21,6 +28,7 @@ export async function readConfig(path: string) {
 
 async function fetchAPI(config: Config, endpoint: string, method: Method, body?: Record<string, unknown>) {
   const { accountId, apiToken } = config;
+
   const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/${endpoint}`, {
     method: method,
     headers: {
@@ -29,7 +37,14 @@ async function fetchAPI(config: Config, endpoint: string, method: Method, body?:
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const object: Record<string, unknown> = await response.json();
+
+  const object: ApiResponse = await response.json();
+
+  if (!object.success) {
+    const errors = object.errors;
+    throw Error(errors.join("\n"));
+  }
+
   return object;
 }
 
@@ -37,14 +52,15 @@ async function listNamespaces(args: string[], config: Config) {
   if (args.length) {
     throw Error(`Wrong number of arguments: expected 0, but got ${args.length}.`)
   }
+
   const response = await fetchAPI(config, "storage/kv/namespaces", "GET");
 
-  if (!response.success) {
-    const errors = response.errors as string[];
-    throw Error(errors.join("\n"));
-  }
+  const namespaces = response.result as { 
+    id: string, 
+    title: string,
+    support_url_encoding: boolean 
+  }[];
 
-  const namespaces = response.result as { id: string, title: string, support_url_encoding: boolean }[];
   namespaces.forEach(namespace => {
     console.log(namespace.title);
   });
