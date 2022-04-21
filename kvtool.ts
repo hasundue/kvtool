@@ -1,3 +1,4 @@
+import { Command } from "https://deno.land/x/cliffy@v0.23.0/command/mod.ts";
 import { parse } from "https://deno.land/std@0.136.0/encoding/toml.ts";
 
 type Config = {
@@ -60,15 +61,7 @@ async function fetchAPI(config: Config, endpoint: string, method: Method, body?:
   return object;
 }
 
-function assertNumberOfArgs(args: string[], num: number) {
-  if (args.length !== num) {
-    throw Error(`Wrong number of arguments: expected ${num}, but got ${args.length}.`)
-  }
-}
-
-async function listNamespaces(args: string[], config: Config) {
-  assertNumberOfArgs(args, 0);
-
+async function getNamespaceId(config: Config, title: string) {
   const response = await fetchAPI(config, "storage/kv/namespaces", "GET");
 
   const namespaces = response.result as { 
@@ -77,50 +70,60 @@ async function listNamespaces(args: string[], config: Config) {
     support_url_encoding: boolean 
   }[];
 
+  const namespace = namespaces.find(namespace => namespace.title === title);
+
+  if (!namespace) {
+    throw Error(`Namespace ${title} not found`);
+  }
+
+  return namespace.id;
+}
+
+async function listNamespaces() {
+  const config = await readConfig("./wrangler.toml");
+  const response = await fetchAPI(config, "storage/kv/namespaces", "GET");
+
+  const namespaces = response.result as { 
+    id: string, 
+    title: string,
+    support_url_encoding: boolean 
+  }[];
+
+  namespaces.forEach(namespace => {
+    console.log(namespace.title);
+  });
+
   return namespaces;
 }
 
-async function renameNamespace(args: string[], config: Config) {
-  assertNumberOfArgs(args, 2);
-  const [ from, to ] = args;
+async function renameNamespace(src: string, dest: string) {
+  const config = await readConfig("./wrangler.toml");
+  const id = await getNamespaceId(config, src);
 
-  const list = await listNamespaces([], config);
-  const namespace = list.find(namespace => namespace.title === from);
+  const data = { title: dest };
 
-  if (!namespace) {
-    throw Error(`Namespace ${from} not found`);
-  }
+  await fetchAPI(config, `storage/kv/namespaces/${id}`, "PUT", data);
 
-  const data = { title: to };
-
-  await fetchAPI(config, `storage/kv/namespaces/${namespace.id}`, "PUT", data);
-
-  console.log(`Renamed ${from} to ${to}`);
+  console.log(`Renamed ${src} to ${dest}`);
 }
 
-if (import.meta.main) {
-  try {
-    const config = await readConfig("./wrangler.toml");
+try { 
+  await new Command()
+    // kvtool
+    .name("kvtool")
+    .version("0.1.0")
+    .description("CLI utility for Cloudflare Workers KV")
 
-    const command = Deno.args[0];
-    const args = Deno.args.slice(1);
+    // list
+    .command("list", "List namespaces owned by your account")
+    .action(() => listNamespaces())
 
-    switch (command) {
-      case "ls": {
-        const namespaces = await listNamespaces(args, config);
-        namespaces.forEach(namespace => {
-          console.log(namespace.title);
-        });
-        break;
-      }
-      case "mv":
-        await renameNamespace(args, config);
-        break;
-      default: 
-        throw Error(`Unknown command: ${command}`);
-    }
-  }
-  catch(error) {
-    console.log(error);
-  }
+    // rename
+    .command("rename <src:string> <dest:string>", "Rename a namespace")
+    .action((_options: void, src: string, dest: string) => renameNamespace(src, dest))
+
+    .parse(Deno.args)
+}
+catch (error) {
+  console.log(error);
 }
