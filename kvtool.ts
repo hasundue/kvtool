@@ -79,8 +79,8 @@ async function getNamespaceId(config: Config, title: string) {
   return namespace.id;
 }
 
-async function listNamespaces() {
-  const config = await readConfig("./wrangler.toml");
+async function listNamespaces(options: Options) {
+  const config = await readConfig(options.config);
   const response = await fetchAPI(config, "storage/kv/namespaces", "GET");
 
   const namespaces = response.result as { 
@@ -96,8 +96,8 @@ async function listNamespaces() {
   return namespaces;
 }
 
-async function renameNamespace(src: string, dest: string) {
-  const config = await readConfig("./wrangler.toml");
+async function renameNamespace(options: Options, src: string, dest: string) {
+  const config = await readConfig(options.config);
   const id = await getNamespaceId(config, src);
 
   const data = { title: dest };
@@ -107,20 +107,29 @@ async function renameNamespace(src: string, dest: string) {
   console.log(`Renamed ${src} to ${dest}`);
 }
 
+type Options = {
+  config: string;
+};
+
 try { 
   await new Command()
     // kvtool
     .name("kvtool")
     .version("0.1.0")
     .description("CLI utility for Cloudflare Workers KV")
+    .globalOption(
+      "-c --config <path>",
+      "Path to a configuration file",
+      { default: "./wrangler.toml" }
+    )
 
     // list
     .command("list", "List namespaces owned by your account")
-    .action(() => listNamespaces())
+    .action((options) => listNamespaces(options))
 
     // rename
-    .command("rename <src:string> <dest:string>", "Rename a namespace")
-    .action((_options: void, src: string, dest: string) => renameNamespace(src, dest))
+    .command("rename <src> <dest>", "Rename a namespace")
+    .action((options, src: string, dest: string) => renameNamespace(options, src, dest))
 
     .parse(Deno.args)
 }
