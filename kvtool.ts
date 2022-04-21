@@ -51,12 +51,12 @@ async function listNamespaces(args: string[], config: Config) {
 }
 
 if (import.meta.main) {
-  const config = await readConfig("./wrangler.toml");
+  try {
+    const config = await readConfig("./wrangler.toml");
 
-  const command = Deno.args[0];
-  const args = Deno.args.slice(1);
+    const command = Deno.args[0];
+    const args = Deno.args.slice(1);
 
-  try { 
     switch (command) {
       case "ls": 
         await listNamespaces(args, config);
