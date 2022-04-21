@@ -7,12 +7,23 @@ type Config = {
 
 type ApiResponse = {
   success: boolean;
-  errors: string[];
+  errors: ApiError[];
   messages: string[];
   [field: string]: unknown;
-}
+};
 
-type Method = "GET" | "POST";
+type ApiError = {
+  code: number;
+  message: string;
+};
+
+const ApiError = {
+  stringify(error: ApiError) { 
+    return `${error.code}: ${error.message}`;
+  },
+};
+
+type Method = "GET" | "PUT";
 
 export async function readConfig(path: string) {
   const toml = await Deno.readTextFile(path);
@@ -42,16 +53,21 @@ async function fetchAPI(config: Config, endpoint: string, method: Method, body?:
 
   if (!object.success) {
     const errors = object.errors;
-    throw Error(errors.join("\n"));
+    const messages = errors.map(error => ApiError.stringify(error));
+    throw Error(messages.join("\n"));
   }
 
   return object;
 }
 
-async function listNamespaces(args: string[], config: Config) {
-  if (args.length) {
-    throw Error(`Wrong number of arguments: expected 0, but got ${args.length}.`)
+function assertNumberOfArgs(args: string[], num: number) {
+  if (args.length !== num) {
+    throw Error(`Wrong number of arguments: expected ${num}, but got ${args.length}.`)
   }
+}
+
+async function listNamespaces(args: string[], config: Config) {
+  assertNumberOfArgs(args, 0);
 
   const response = await fetchAPI(config, "storage/kv/namespaces", "GET");
 
@@ -61,9 +77,25 @@ async function listNamespaces(args: string[], config: Config) {
     support_url_encoding: boolean 
   }[];
 
-  namespaces.forEach(namespace => {
-    console.log(namespace.title);
-  });
+  return namespaces;
+}
+
+async function renameNamespace(args: string[], config: Config) {
+  assertNumberOfArgs(args, 2);
+  const [ from, to ] = args;
+
+  const list = await listNamespaces([], config);
+  const namespace = list.find(namespace => namespace.title === from);
+
+  if (!namespace) {
+    throw Error(`Namespace ${from} not found`);
+  }
+
+  const data = { title: to };
+
+  await fetchAPI(config, `storage/kv/namespaces/${namespace.id}`, "PUT", data);
+
+  console.log(`Renamed ${from} to ${to}`);
 }
 
 if (import.meta.main) {
@@ -74,8 +106,15 @@ if (import.meta.main) {
     const args = Deno.args.slice(1);
 
     switch (command) {
-      case "ls": 
-        await listNamespaces(args, config);
+      case "ls": {
+        const namespaces = await listNamespaces(args, config);
+        namespaces.forEach(namespace => {
+          console.log(namespace.title);
+        });
+        break;
+      }
+      case "mv":
+        await renameNamespace(args, config);
         break;
       default: 
         throw Error(`Unknown command: ${command}`);
