@@ -24,7 +24,7 @@ const ApiError = {
   },
 };
 
-type Method = "GET" | "POST" | "PUT";
+type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 export async function readConfig(path: string) {
   const toml = await Deno.readTextFile(path);
@@ -42,7 +42,7 @@ async function fetchAPI(
   options: Options,
   endpoint: string,
   method: Method,
-  body?: Record<string, unknown> | Record<string, unknown>[],
+  body?: Record<string, unknown> | Record<string, unknown>[] | string[],
 ) {
   const { accountId, apiToken } = await readConfig(options.config);
 
@@ -172,6 +172,28 @@ async function copyNamespace(options: Options, src: string, dest: string) {
   console.log(`Copied a namespace ${src} to ${dest}`);
 }
 
+async function clearNamespace(options: Options, title: string) {
+  const id = await getNamespaceId(options, title);
+  
+  if (!id) {
+    throw Error(`Namespace ${title} not found.`);
+  }
+
+  const response = await fetchAPI(options, `namespaces/${id}/keys`, "GET");
+
+  const keys = response.result as {
+    name: string,
+    expiration?: number,
+    metadata?: { [key: string]: string }, 
+  }[];
+
+  const keyNames = keys.map(key => key.name);
+
+  await fetchAPI(options, `namespaces/${id}/bulk`, "DELETE", keyNames);
+
+  console.log(`Deleted all key-value paris in ${title}`);
+}
+
 type Options = {
   config: string;
 };
@@ -180,7 +202,7 @@ try {
   await new Command()
     // kvtool
     .name("kvtool")
-    .version("0.1.0")
+    .version("0.2.0")
     .description("CLI utility for Cloudflare Workers KV")
     .globalOption(
       "-c --config <path>",
@@ -203,6 +225,10 @@ try {
     // copy
     .command("copy <src> <dest>", "Copy a namespace")
     .action((options, src: string, dest: string) => copyNamespace(options, src, dest))
+
+    // clear
+    .command("clear <title>", "Delete all key-value pairs in a namespace")
+    .action((options, title: string) => clearNamespace(options, title))
 
     .parse(Deno.args)
 }
