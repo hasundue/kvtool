@@ -3,7 +3,7 @@ CLI utility for Cloudflare Workers KV
 
 ## Installation
 ```
-deno install --allow-net --allow-read https://deno.land/x/kvtool@0.1.0/kvtool.ts
+deno install --allow-net --allow-read https://deno.land/x/kvtool@0.1.1/kvtool.ts
 ```
 
 ## Setup
