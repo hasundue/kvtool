@@ -80,14 +80,31 @@ async function getNamespaceId(options: Options, title: string) {
   return namespace ? namespace.id : undefined;
 }
 
-async function listNamespaces(options: Options, verbose = true) {
-  const response = await fetchAPI(options, "namespaces", "GET") as ApiResponse;
+type Namespace = {
+  id: string;
+  title: string;
+  support_url_encoding: boolean;
+}
 
-  const namespaces = response.result as { 
-    id: string, 
-    title: string,
-    support_url_encoding: boolean 
-  }[];
+async function listNamespaces(options: Options, verbose = true) {
+  const perPage = 20;
+  let page = 1;
+  let namespaces: Namespace[] = [];
+
+  while (true) {
+    const response = await fetchAPI(
+      options,
+      `namespaces?page=${page}&per_page=${perPage}&order=title`,
+      "GET"
+    ) as ApiResponse;
+
+    const result = response.result as Namespace[];
+    namespaces = namespaces.concat(result);
+
+    if (result.length < perPage) break;
+
+    page++;
+  }
 
   if (verbose) {
     namespaces.forEach(namespace => {
