@@ -6,6 +6,14 @@ CLI utility for Cloudflare Workers KV
 deno install --allow-net --allow-read https://deno.land/x/kvtool@0.1.0/kvtool.ts
 ```
 
+## Setup
+You need to set account_id and api_token in wrangler.toml:
+
+```toml
+account_id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+api_token = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
 ## Usage
 ```
 Usage:   kvtool
