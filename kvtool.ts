@@ -1,5 +1,5 @@
-import { Command } from "https://deno.land/x/cliffy@v0.23.0/command/mod.ts";
-import { parse } from "https://deno.land/std@0.136.0/encoding/toml.ts";
+import { Command } from "https://deno.land/x/cliffy@v0.24.2/command/mod.ts";
+import { parse } from "https://deno.land/std@0.138.0/encoding/toml.ts";
 
 type Config = {
   accountId: string;
@@ -212,23 +212,23 @@ try {
 
     // list
     .command("list", "List namespaces owned by your account")
-    .action((options) => listNamespaces(options))
+    .action((options: Options) => listNamespaces(options))
 
     // create
     .command("create <title>", "Create a namespace")
-    .action((options, title: string) => createNamespace(options, title))
+    .action((options: Options, title: string) => createNamespace(options, title))
 
     // rename
     .command("rename <src> <dest>", "Rename a namespace")
-    .action((options, src: string, dest: string) => renameNamespace(options, src, dest))
+    .action((options: Options, src: string, dest: string) => renameNamespace(options, src, dest))
 
     // copy
     .command("copy <src> <dest>", "Copy a namespace")
-    .action((options, src: string, dest: string) => copyNamespace(options, src, dest))
+    .action((options: Options, src: string, dest: string) => copyNamespace(options, src, dest))
 
     // clear
     .command("clear <title>", "Delete all key-value pairs in a namespace")
-    .action((options, title: string) => clearNamespace(options, title))
+    .action((options: Options, title: string) => clearNamespace(options, title))
 
     .parse(Deno.args)
 }
