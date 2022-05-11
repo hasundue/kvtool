@@ -26,7 +26,7 @@ const ApiError = {
 
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
-export async function readConfig(path: string) {
+async function readConfig(path: string) {
   const toml = await Deno.readTextFile(path);
   const object = parse(toml);
 
