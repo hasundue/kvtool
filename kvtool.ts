@@ -1,5 +1,7 @@
 import { Command } from "https://deno.land/x/cliffy@v0.24.2/command/mod.ts";
 import { parse } from "https://deno.land/std@0.138.0/encoding/toml.ts";
+import { ensureDir } from "https://deno.land/std@0.138.0/fs/mod.ts";
+import { join } from "https://deno.land/std@0.138.0/path/mod.ts";
 
 type Config = {
   accountId: string;
@@ -140,10 +142,19 @@ async function createNamespace(options: Options, title: string, verbose = true) 
 }
 
 async function copyNamespace(options: Options, src: string, dest: string) {
-  const srcId = await getNamespaceId(options, src);
+  const pairs = await bulkGetNamespace(options, src);
+
+  const destId = await getNamespaceId(options, dest) ?? await createNamespace(options, dest, false);
+  await fetchAPI(options, `namespaces/${destId}/bulk`, "PUT", pairs);
+
+  console.log(`Copied a namespace ${src} to ${dest}`);
+}
+
+async function bulkGetNamespace(options: Options, title: string) {
+  const srcId = await getNamespaceId(options, title);
   
   if (!srcId) {
-    throw Error(`Namespace ${src} not found.`);
+    throw Error(`Namespace ${title} not found.`);
   }
 
   const response = await fetchAPI(options, `namespaces/${srcId}/keys`, "GET");
@@ -154,22 +165,16 @@ async function copyNamespace(options: Options, src: string, dest: string) {
     metadata?: { [key: string]: string }, 
   }[];
 
-  const destId = await getNamespaceId(options, dest) ?? await createNamespace(options, dest, false);
-
-  const pairs = await Promise.all(keys.map(async key => {
+  return await Promise.all(keys.map(async key => {
     const value = await fetchAPI(options, `namespaces/${srcId}/values/${key.name}`, "GET");
     if (!value) {
       throw Error(`Value not found for a key ${key.name}.`);
     }
     return {
       key: key.name,
-      value: JSON.stringify(value),
+      value,
     };
   }));
-
-  await fetchAPI(options, `namespaces/${destId}/bulk`, "PUT", pairs);
-
-  console.log(`Copied a namespace ${src} to ${dest}`);
 }
 
 async function clearNamespace(options: Options, title: string) {
@@ -194,6 +199,17 @@ async function clearNamespace(options: Options, title: string) {
   console.log(`Deleted all key-value paris in ${title}`);
 }
 
+async function dumpNamespace(options: Options, title: string, dir: string) {
+  const pairs = await bulkGetNamespace(options, title);
+
+  ensureDir(dir);
+  await Promise.all(pairs.map(pair => {
+    return Deno.writeTextFile(join(dir, pair.key), JSON.stringify(pair.value))
+  }));
+
+  console.log(`Dumped all key-value paris in ${title} into ${dir}`);
+}
+
 type Options = {
   config: string;
 };
@@ -202,7 +218,7 @@ try {
   await new Command()
     // kvtool
     .name("kvtool")
-    .version("0.2.0")
+    .version("0.3.0")
     .description("CLI utility for Cloudflare Workers KV")
     .globalOption(
       "-c --config <path>",
@@ -229,6 +245,10 @@ try {
     // clear
     .command("clear <title>", "Delete all key-value pairs in a namespace")
     .action((options: Options, title: string) => clearNamespace(options, title))
+
+    // dump
+    .command("dump <title> <dir:file>", "Dump a namespace into files")
+    .action((options: Options, title: string, dir: string) => dumpNamespace(options, title, dir))
 
     .parse(Deno.args)
 }
