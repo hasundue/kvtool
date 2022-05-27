@@ -159,7 +159,7 @@ async function bulkGetNamespace(options: Options, title: string) {
     throw Error(`Namespace ${title} not found.`);
   }
 
-  const response = await fetchAPI(options, "strage/kv", `namespaces/${srcId}/keys`, "GET");
+  const response = await fetchAPI(options, "storage/kv", `namespaces/${srcId}/keys`, "GET");
 
   const keys = response.result as {
     name: string,
