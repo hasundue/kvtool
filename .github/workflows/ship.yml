@@ -21,8 +21,11 @@ jobs:
         with:
           deno-version: v1.x
 
+      - name: Install ghlog
+        run: deno install -A https://deno.land/x/ghlog/ghlog.ts 
+
       - name: Generate Release Notes
-        run: deno run -A ./ghlog.ts ${{ github.repository }} -v '${{ github.event.inputs.tag }}'
+        run: ghlog ${{ github.repository }} -v '${{ github.event.inputs.tag }}'
 
       - name: Release v${{ github.event.inputs.tag }}
         uses: ncipollo/release-action@v1
