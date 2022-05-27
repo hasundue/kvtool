@@ -3,7 +3,7 @@ CLI utility for Cloudflare Workers KV
 
 ## Installation
 ```
-deno install --allow-net --allow-read --allow-write https://deno.land/x/kvtool@v0.3.0/kvtool.ts
+deno install --allow-net --allow-read --allow-write https://deno.land/x/kvtool@v0.4.0/kvtool.ts
 ```
 
 ## Setup
@@ -17,7 +17,7 @@ api_token = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ## Usage
 ```
 Usage:   kvtool
-Version: 0.3.0
+Version: 0.4.0
 
 Description:
 
@@ -37,6 +37,7 @@ Commands:
   copy    <src> <dest>   - Copy a namespace
   clear   <title>        - Delete all key-value pairs in a namespace
   dump    <title> <dir>  - Dump a namespace into files
+  pages   <project>      - List variables binded to KV namespaces in a Pages project
 ```
 
 ## Acknowledgement

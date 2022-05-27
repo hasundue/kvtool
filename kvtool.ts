@@ -42,14 +42,15 @@ async function readConfig(path: string) {
 
 async function fetchAPI(
   options: Options,
-  endpoint: string,
+  category: string,
+  action: string,
   method: Method,
   body?: Record<string, unknown> | Record<string, unknown>[] | string[],
 ) {
   const { accountId, apiToken } = await readConfig(options.config);
 
   const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/${endpoint}`,
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/${category}/${action}`,
     {
       method: method,
       headers: {
@@ -60,7 +61,7 @@ async function fetchAPI(
     }
   );
 
-  if (endpoint.includes("/values/")) {
+  if (action.includes("/values/")) {
     return await response.json();
   }
 
@@ -96,6 +97,7 @@ async function listNamespaces(options: Options, verbose = true) {
   while (true) {
     const response = await fetchAPI(
       options,
+      "storage/kv",
       `namespaces?page=${page}&per_page=${perPage}&order=title`,
       "GET"
     ) as ApiResponse;
@@ -125,13 +127,13 @@ async function renameNamespace(options: Options, src: string, dest: string) {
   }
 
   const data = { title: dest };
-  await fetchAPI(options, `namespaces/${id}`, "PUT", data);
+  await fetchAPI(options, "storage/kv", `namespaces/${id}`, "PUT", data);
 
   console.log(`Renamed ${src} to ${dest}`);
 }
 
 async function createNamespace(options: Options, title: string, verbose = true) {
-  const response = await fetchAPI(options, `namespaces`, "POST", { title });
+  const response = await fetchAPI(options, "storage/kv", `namespaces`, "POST", { title });
   const { id }: { id: string } = response.result;
 
   if (verbose) {
@@ -145,7 +147,7 @@ async function copyNamespace(options: Options, src: string, dest: string) {
   const pairs = await bulkGetNamespace(options, src);
 
   const destId = await getNamespaceId(options, dest) ?? await createNamespace(options, dest, false);
-  await fetchAPI(options, `namespaces/${destId}/bulk`, "PUT", pairs);
+  await fetchAPI(options, "storage/kv", `namespaces/${destId}/bulk`, "PUT", pairs);
 
   console.log(`Copied a namespace ${src} to ${dest}`);
 }
@@ -157,7 +159,7 @@ async function bulkGetNamespace(options: Options, title: string) {
     throw Error(`Namespace ${title} not found.`);
   }
 
-  const response = await fetchAPI(options, `namespaces/${srcId}/keys`, "GET");
+  const response = await fetchAPI(options, "strage/kv", `namespaces/${srcId}/keys`, "GET");
 
   const keys = response.result as {
     name: string,
@@ -166,7 +168,7 @@ async function bulkGetNamespace(options: Options, title: string) {
   }[];
 
   return await Promise.all(keys.map(async key => {
-    const value = await fetchAPI(options, `namespaces/${srcId}/values/${key.name}`, "GET");
+    const value = await fetchAPI(options, "storage/kv", `namespaces/${srcId}/values/${key.name}`, "GET");
     if (!value) {
       throw Error(`Value not found for a key ${key.name}.`);
     }
@@ -184,7 +186,7 @@ async function clearNamespace(options: Options, title: string) {
     throw Error(`Namespace ${title} not found.`);
   }
 
-  const response = await fetchAPI(options, `namespaces/${id}/keys`, "GET");
+  const response = await fetchAPI(options, "storage/kv", `namespaces/${id}/keys`, "GET");
 
   const keys = response.result as {
     name: string,
@@ -194,7 +196,7 @@ async function clearNamespace(options: Options, title: string) {
 
   const keyNames = keys.map(key => key.name);
 
-  await fetchAPI(options, `namespaces/${id}/bulk`, "DELETE", keyNames);
+  await fetchAPI(options, "storage/kv", `namespaces/${id}/bulk`, "DELETE", keyNames);
 
   console.log(`Deleted all key-value paris in ${title}`);
 }
@@ -210,6 +212,13 @@ async function dumpNamespace(options: Options, title: string, dir: string) {
   console.log(`Dumped all key-value paris in ${title} into ${dir}`);
 }
 
+async function listBindings(options: Options, project: string) {
+  const response = await fetchAPI(options, "pages/projects", `${project}`, "GET");
+  const bindings = response.result.deployment_configs.production.kv_namespaces;
+  const keys = Object.keys(bindings);
+  keys.forEach(key => console.log(key));
+}
+
 type Options = {
   config: string;
 };
@@ -218,7 +227,7 @@ try {
   await new Command()
     // kvtool
     .name("kvtool")
-    .version("0.3.0")
+    .version("0.4.0")
     .description("CLI utility for Cloudflare Workers KV")
     .globalOption(
       "-c --config <path>",
@@ -249,6 +258,10 @@ try {
     // dump
     .command("dump <title> <dir:file>", "Dump a namespace into files")
     .action((options: Options, title: string, dir: string) => dumpNamespace(options, title, dir))
+
+    // pages
+    .command("pages <project>", "List variables binded to KV namespaces in a Pages project")
+    .action((options: Options, project: string) => listBindings(options, project))
 
     .parse(Deno.args)
 }
